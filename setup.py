@@ -12,7 +12,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/abja-dhi/fast-mikeio",
-    packages=['fast_mikeio'],
+    packages=['fastmikeio'],
     install_requires=[
         'numpy',
         'mikecore',
