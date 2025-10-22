@@ -1,3 +1,6 @@
 examples/
 *.csv
 *.egg-info
+/fastmikeio/__build/
+/fastmikeio/__pycache__/
+/fastmikeio/tests/__pycache__/
