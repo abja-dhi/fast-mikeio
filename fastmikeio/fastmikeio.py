@@ -58,7 +58,7 @@ class MatplotlibShell:
     mpl.rcParams['legend.framealpha']= 0.5
     mpl.rcParams['axes.titlesize'] = 12
     mpl.rcParams['axes.titleweight'] ='normal'
-    mpl.rcParams['font.family'] ='Times New Roman'
+    mpl.rcParams['font.family'] ='monospace'
     mpl.rcParams['axes.labelsize'] = 10
     mpl.rcParams['axes.linewidth'] = 1.25
     mpl.rcParams['xtick.major.size'] = 5.0
@@ -235,7 +235,7 @@ class DfsuPlot:
             data = self.dfsu.get_data(item_idx=item_idx, time_idx=time_idx, layer_idx=layer_idx).squeeze()
         node_data = self.dfsu.get_node_data(data, extrapolate=True)
         masked_data = np.where(node_data <= prop["bottom_threshold"], prop["bottom_threshold"], node_data)
-        triang = self._get_tris(node_data)
+        triang = self._get_tris(node_data, x_offset=prop["x_offset"], y_offset=prop["y_offset"])
         if prop["levels"] is None:
             vmin = np.nanmin(node_data)
             vmax = np.nanmax(node_data)
@@ -267,7 +267,7 @@ class DfsuPlot:
         data = self.dfsu.statistics.quantile(q=q, item_idx=item_idx, layer_idx=layer_idx).squeeze()
         ax = self.contourf(ax=ax, data=data, **kwargs)
         return ax
-    
+
     def max(self, ax=None, item_idx=None, layer_idx=None, **kwargs):
         item_idx = 0 if item_idx is None else item_idx
         layer_idx = 0 if layer_idx is None else layer_idx
@@ -277,7 +277,7 @@ class DfsuPlot:
         data = self.dfsu.statistics.max(item_idx=item_idx, layer_idx=layer_idx).squeeze()
         ax = self.contourf(ax=ax, data=data, **kwargs)
         return ax
-    
+
     def min(self, ax=None, item_idx=None, layer_idx=None, **kwargs):
         item_idx = 0 if item_idx is None else item_idx
         layer_idx = 0 if layer_idx is None else layer_idx
@@ -287,7 +287,7 @@ class DfsuPlot:
         data = self.dfsu.statistics.min(item_idx=item_idx, layer_idx=layer_idx).squeeze()
         ax = self.contourf(ax=ax, data=data, **kwargs)
         return ax
-    
+
     def mean(self, ax=None, item_idx=None, layer_idx=None, **kwargs):
         item_idx = 0 if item_idx is None else item_idx
         layer_idx = 0 if layer_idx is None else layer_idx
@@ -341,10 +341,24 @@ class DfsuPlot:
             colorbar.set_ticklabels(cbar_ticks)
         else:
             colorbar.set_ticklabels([DfsuPlot.print_number(i) for i in levels])
-    def _get_tris(self, z):
+    def _get_tris(self, z, x_offset=0.0, y_offset=0.0):
         et = self.dfsu.geometry.et_2d
         nc = self.dfsu.geometry.nc_2d
         ec = self.dfsu.geometry.ec_2d
+        nc = nc.copy()
+        nc[:, 0] = nc[:, 0] + x_offset
+        nc[:, 1] = nc[:, 1] + y_offset
+        ec = ec.copy()
+        ec[:, 0] = ec[:, 0] + x_offset
+        ec[:, 1] = ec[:, 1] + y_offset
+        nc_min_x = np.min(nc[:, 0])
+        nc_max_x = np.max(nc[:, 0])
+        nc_min_y = np.min(nc[:, 1])
+        nc_max_y = np.max(nc[:, 1])
+        if (nc_max_x - nc_min_x > 3000) or (nc_max_y - nc_min_y > 3000):
+            nc = nc / 1000.0
+            ec = ec / 1000.0 
+        
         elem_table, _, z = self._create_tri_only_element_table(et, ec, data=z)
         triang = tri.Triangulation(nc[:, 0], nc[:, 1], elem_table)
         return triang
@@ -399,6 +413,8 @@ class DfsuPlot:
         out["xlabel"] = kwargs.get('xlabel', '')
         out["ylabel"] = kwargs.get('ylabel', '')
         out["zorder"] = kwargs.get('zorder', 1)
+        out["x_offset"] = kwargs.get('x_offset', 0.0)
+        out["y_offset"] = kwargs.get('y_offset', 0.0)
         for key, value in kwargs.items():
             if key not in out:
                 out[key] = value
