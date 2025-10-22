@@ -4,3 +4,5 @@ examples/
 /fastmikeio/__build/
 /fastmikeio/__pycache__/
 /fastmikeio/tests/__pycache__/
+/fastmikeio/__init__*
+!/fastmikeio/__init__.py

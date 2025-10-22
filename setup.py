@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="fast-mikeio",
+    name="fastmikeio",
     version="0.0.1",
     author="Abbas Jazaeri",
     author_email="abja@dhigroup.com",
