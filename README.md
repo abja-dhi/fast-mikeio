@@ -11,5 +11,5 @@
 ```python
 import fastmikeio
 dfsu = fastmikeio.read("3D dfsu.dfsu")
-dfsu.to_mesh(output_fname)
+dfsu.geometry.to_mesh(output_fname)
 ```
