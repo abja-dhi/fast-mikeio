@@ -1,0 +1,3 @@
+examples/
+*.csv
+/pyplume_dhi.egg-info
