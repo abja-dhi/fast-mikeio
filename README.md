@@ -1,4 +1,4 @@
 # Installation
-Clone the repo\n
-python setup.py sdist bdist_wheel\n
+Clone the repo
+python setup.py sdist bdist_wheel
 pip install .
