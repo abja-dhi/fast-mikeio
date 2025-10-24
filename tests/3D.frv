@@ -1,0 +1,198 @@
+// Created     : 2025-10-23 13:33:32
+// DLL         : C:\Program Files (x86)\DHI\MIKE Zero\2025\bin\x64\pfs2004.dll
+// Version     : 23.0.3.18318
+
+[FEM_RESULT_VIEWER]
+   [FEM_DATA]
+      FILE_NAME = |.\3D.dfsu|
+   EndSect  // FEM_DATA
+
+   [IMAGE_FILES]
+   EndSect  // IMAGE_FILES
+
+   [FEM_RESULT_VIEWER_VIEW]
+      TYPE = 'CFemResultViewerView'
+      [HORIZONTAL_SPECIFIC]
+         [DATA]
+            Sigma_Layer = 9
+            Stepsize_Layer = 1
+            Z_Level = 0.0
+            Stepsize_Z = 5.0
+            Sigma_Layer_On = true
+         EndSect  // DATA
+
+         [DISPLAY_INFO]
+            Display_Date = true
+            Display_Time = true
+            Display_Time_Step = true
+            Display_Layer = true
+         EndSect  // DISPLAY_INFO
+
+      EndSect  // HORIZONTAL_SPECIFIC
+
+      [COMMON_PARAMETERS]
+         [DATA]
+            Time_Step = 14
+            Stepsize_Time = 1
+            Contour_Item = 2
+            Animation_Start_Time = 2023, 4, 8, 11, 0, 0
+            Animation_End_Time = 2023, 4, 9, 1, 0, 0
+            Animation_Time_Step = 3600.0
+            Animation_Time_Step_Unit = 1400
+            Animation_Num_Time_Steps = 15
+            Animation_Current_Time_Step = 14
+         EndSect  // DATA
+
+         [CHART]
+            Title = 'Data File: 3D.dfsu'
+            Title_On = 0
+            Zoom_x0 = -118.97421745483
+            Zoom_y0 = 8.90664732228
+            Zoom_x1 = -115.05782454517
+            Zoom_y1 = 12.38184032532
+            X_AxisLabel = ''
+            Y_AxisLabel = ''
+            Draw_Labels = 1
+            Aspect_Ratio_Type = 1
+            Aspect_Ratio = 1.0
+            Attached_Overlay_Align = 2
+         EndSect  // CHART
+
+         [FEM_MESH_OVERLAY]
+            View_Shading_Type = 2
+            View_Shading_Color_Type = 1
+            View_Box_Divider = 0
+            View_Box_Transparency_Val = 0.5
+            View_Coloring = 0
+            View_Isoline_Ex = false, 0.1, 0, 0, 0
+            Isoline_Feathering = false, 0
+            View_Isoline_Labels = 0
+            Remove_Colliding_Labels = 1
+            RemoveAdjacentIdenticalLabels = 1
+            XIsoLabelSlots = 10
+            YIsoLabelSlots = 10
+            Element_Mesh_Ex = false, 0.1, 0, 0, 0
+            Borders_Ex = true, 0.25, 0, 0, 0
+            Smooth_Edge_On = 1
+            White_Background = 0
+            Dried_Land_As_Background = 0
+         EndSect  // FEM_MESH_OVERLAY
+
+         [VECTOR_OVERLAY]
+            Vectors_On = 0
+            X_Item = 2
+            Y_Item = 2
+            Z_Item = 2
+            Vector_Mode = 0
+            Vector_GridX = 25
+            Vector_GridY = 25
+            Ref_Vector_On = 0
+            Ref_Vector_Text = ''
+            Ref_Vector_X_Length = 1.0
+            Ref_Vector_Y_Length = 1.0
+            Automatic_Vector_Scaling = 1
+            Max_Vector_X_Length = 0.009549120421226074
+            Max_Vector_Y_Length = 0.009549120421226074
+            Vector_Scale_X = 1.0
+            Vector_Scale_Y = 1.0
+            Vector_Style = 0.15, 0.5, 0, 0, 0
+            Use_Length_Limit = 1
+            Length_Limit = 10.0
+         EndSect  // VECTOR_OVERLAY
+
+         [COLOR_LEGEND_OVERLAY]
+            Color_Legend_On = 1
+            [MIKEZero_Palette_Definition]
+               Palette_Title = 'Total SSC [kg/m³]'
+               Palette_Type = 0
+               Locked = false
+               Topmost_Value = false
+               Nice_Value = true
+               RGB_Delete_Color = 220, 220, 220
+               RGB_Color_Value = 128, 0, 128
+               RGB_Color_Value = 85, 0, 171
+               RGB_Color_Value = 42, 0, 213
+               RGB_Color_Value = 0, 0, 255
+               RGB_Color_Value = 0, 56, 225
+               RGB_Color_Value = 0, 111, 195
+               RGB_Color_Value = 0, 166, 166
+               RGB_Color_Value = 0, 196, 110
+               RGB_Color_Value = 0, 226, 55
+               RGB_Color_Value = 0, 255, 0
+               RGB_Color_Value = 85, 255, 0
+               RGB_Color_Value = 170, 255, 0
+               RGB_Color_Value = 255, 255, 0
+               RGB_Color_Value = 255, 170, 0
+               RGB_Color_Value = 255, 85, 0
+               RGB_Color_Value = 255, 0, 0
+            EndSect  // MIKEZero_Palette_Definition
+
+         EndSect  // COLOR_LEGEND_OVERLAY
+
+         [Geographical_Grid_Definition]
+            Display_Lon_Lat = false
+            Display_Proj = false
+            Map_Projection = 'LONG/LAT'
+            Northing_Always_Positive = false
+            Easting_Northing_In_Thousands = true
+            [Lon_Lat_Style]
+               [MIKEZero_Line_Object]
+                  Base_Title = 'Lon/Lat Lines'
+                  Base_Reg_Key = ''
+                  Base_Col_Red = 0
+                  Base_Col_Green = 0
+                  Base_Col_Blue = 0
+                  Base_Display_On = true
+                  Line_Thickness = 0.15
+                  Line_Style = 0
+                  Line_Polygon_Style = 0
+               EndSect  // MIKEZero_Line_Object
+
+            EndSect  // Lon_Lat_Style
+
+            [Proj_Style]
+               [MIKEZero_Line_Object]
+                  Base_Title = 'Projection Lines'
+                  Base_Reg_Key = ''
+                  Base_Col_Red = 0
+                  Base_Col_Green = 0
+                  Base_Col_Blue = 0
+                  Base_Display_On = true
+                  Line_Thickness = 0.15
+                  Line_Style = 0
+                  Line_Polygon_Style = 0
+               EndSect  // MIKEZero_Line_Object
+
+            EndSect  // Proj_Style
+
+            OverlayDrawingOrder = 5
+         EndSect  // Geographical_Grid_Definition
+
+         [North_Arrow_Definition]
+            North_Arrow_Type = 0
+            Display = false
+            Position = -1e-35, -1e-35
+            OverlayDrawingOrder = 6
+         EndSect  // North_Arrow_Definition
+
+         [BackgroundOverlay]
+            Display = true
+            Active = false
+            Theme = 10
+            InterpolationType = true
+            AccuracyPct = 0.001
+            MaxSubDiv = 8
+            OverlayDrawingOrder = 0
+         EndSect  // BackgroundOverlay
+
+         [OVERLAY_SETTINGS]
+            Overlay_Drawing_Order = 1, 4, 2, 3, 5, 6
+            Overlay_Display = true, false, true, true, true, true
+         EndSect  // OVERLAY_SETTINGS
+
+      EndSect  // COMMON_PARAMETERS
+
+   EndSect  // FEM_RESULT_VIEWER_VIEW
+
+EndSect  // FEM_RESULT_VIEWER
+

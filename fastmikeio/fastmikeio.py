@@ -162,6 +162,10 @@ class DfsuGeometry:
         ec = nc_2d[self.et_2d]
         return ec.mean(axis=1)
 
+    @property
+    def _tri2d(self) -> tri.Triangulation:
+        return tri.Triangulation(self.nc_2d[:, 0], self.nc_2d[:, 1], self.et_2d)
+
     def _get_bottom_layer_nodes(self):
         nc = self.nc
         n_layers = self.n_layers
@@ -450,7 +454,18 @@ class Dfsu:
     def to_mesh(self, fname):
         self.geometry.to_mesh(fname)
 
-    def get_data(self, item_idx=None, time_idx=None, layer_idx=None):
+    def vertical_extractor(self, x, y, items=None, times=None):
+        x = np.array(x).flatten()
+        y = np.array(y).flatten()
+        finder = self.geometry._tri2d.get_trifinder()
+        elements_2d = finder(x, y)
+        n_layers = self.geometry.n_layers
+        elements = np.array([np.arange(i * n_layers, (i + 1) * n_layers) for i in elements_2d])
+        data = self.get_data(item_idx=items, time_idx=times, reshape=False)
+        vertical_data = data[:, :, elements]
+        return vertical_data
+
+    def get_data(self, item_idx=None, time_idx=None, layer_idx=None, reshape=True):
         """
         Get all data as a 3D numpy array: (items, times, layers, 2d_nodes)
         """
@@ -471,18 +486,24 @@ class Dfsu:
             added = 2
         else:
             added = 1
-        data = np.empty((len(item_idx), len(time_idx), len(layer_idx), n2d), dtype=np.float32)
+        if reshape:
+            data = np.empty((len(item_idx), len(time_idx), len(layer_idx), n2d), dtype=np.float32)
+        else:
+            data = np.empty((len(item_idx), len(time_idx), self.geometry.ec[0].shape[0]), dtype=np.float32)
         for i_item, itm in enumerate(trange(len(item_idx), desc="Items")):
             itm = item_idx[itm]
             for i_time, t in enumerate(trange(len(time_idx), desc="Time steps", leave=False)):
                 t = time_idx[t]
-                full_data = self.dfsu.ReadItemTimeStep(itm + added, t).Data.reshape((n2d, n_layers))
-                sel = full_data[:, layer_idx]
-                data[i_item, i_time, :, :] = sel.T
+                if not reshape:
+                    full_data = self.dfsu.ReadItemTimeStep(itm + added, t).Data
+                    data[i_item, i_time, :] = full_data
+                else:
+                    full_data = self.dfsu.ReadItemTimeStep(itm + added, t).Data.reshape((n2d, n_layers))
+                    sel = full_data[:, layer_idx]
+                    data[i_item, i_time, :, :] = sel.T
         data *= self.unit_conversion
         return data
-
-    
+  
     def get_node_data(self, data, extrapolate=True):
         et = self.geometry.et_2d
         nc = self.geometry.nc_2d

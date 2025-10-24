@@ -1,0 +1,175 @@
+// Created    : 2025-10-23 14:16:57
+// Executable : C:\Program Files (x86)\DHI\MIKE Zero\2025\bin\x64\dataextractionfm.exe
+// Version    : 23.0.3.18318
+
+
+======================= Computing Environment ========================
+  Local machine name              : ABJA-PC1
+  Number of subdomains            : 1
+  Local subdomain id              : -1
+  Specified threads per subdomain : 12
+======================================================================
+
+
+======================================================================
+Target: DataExtractionFM
+
+
+
+  Section: INPUT -----------------------------------------------------
+      file_name : C:\Users\abja\OneDrive - DHI\Scripts\github\myDevelopments\fast-mikeio\tests\Small_3D.dfsu
+      convert : True (default)
+------------------------- Data File Summary --------------------------
+  Creator: 
+  File   : C:\Users\abja\OneDrive - DHI\Scripts\github\myDevelopments\fast-mikeio\tests\Small_3D.dfsu
+  Title  : Output 2
+
+  Start date  Start time  Sets   Interval  Unit
+  2023-04-08    11:00:00    15       3600  second
+
+  Static items:
+  Item name            Item type               Minimum    Maximum Unit
+  Node id              Grid Codes                    1        204 Integer
+  X-coord              Latitude/longitude   -116.08315 -115.48041 degree
+  Y-coord              Latitude/longitude    11.693192  12.094915 degree
+  Z-coord              Item geometry 3-dime      -4270          0 meter
+  Code                 Grid Codes                    0          0 Integer
+  Element id           Grid Codes                    1        160 Integer
+  Element type         Grid Codes                   32         32 Integer
+  No of nodes          Grid Codes                    6          6 Integer
+  Connectivity         Grid Codes                    1        204 Integer
+
+  Dynamic items:
+  Item name            Item type               Minimum    Maximum Unit
+  Z coordinate         Item geometry 3-dime      -4270    0.44425 meter
+  Total SSC            Concentration_2               0          8 kg/meter^3
+----------------------------------------------------------------------
+
+
+========================== Mesh information ==========================
+  Number of elements         : 160
+  Number of faces            : 0
+  Number of nodes            : 204
+  Number of sections         : 0
+  Min x-coordinate (degree)  : -116.08315
+  Max x-coordinate (degree)  : -115.48041
+  Min y-coordinate (degree)  : 11.693192
+  Max y-coordinate (degree)  : 12.094915
+  Min z-coordinate (m)       : -4270
+  Max z-coordinate (m)       : 0
+======================================================================
+
+Warning: The bathymetry adjustment is not taken intoaccount. To do
+         that the 3D input file must contain the item volume
+
+
+  Section: OUTPUTS ---------------------------------------------------
+      number_of_outputs : 3
+
+
+    Section: OUTPUT_1 ------------------------------------------------
+        include : 0
+
+
+    Section: OUTPUT_2 ------------------------------------------------
+        include : 0
+
+
+    Section: OUTPUT_3 ------------------------------------------------
+        include : 1
+        file_name : C:\Users\abja\OneDrive - DHI\Scripts\github\myDevelopments\fast-mikeio\tests\Small_Vertical.dfsu
+        title : Output 3
+        type : 2
+        format : 2
+        delete_value : 1.E-35 (default)
+        flood_and_dry : 2
+        precision : 2 (default)
+        use_end_time : 0 (default)
+        first_time_step : 0
+        last_time_step : 14
+        time_step_frequency : 1
+        number_of_variables : 0 (default)
+        interpolation_type : 1
+        type_plane : 2
+
+
+      Section: PARAMETERS_3D -----------------------------------------
+          item_2 : 1
+        coordinate_type : LONG/LAT
+        input_format : 1
+
+
+      Section: Plane -------------------------------------------------
+          number_of_points : 2
+
+
+        Section: POINT_1 ---------------------------------------------
+            x : -116.05
+            y : 11.9
+
+
+        Section: POINT_2 ---------------------------------------------
+            x : -115.5
+            y : 11.9
+          layer_min : 1
+          layer_max : 16
+
+
+========================= Output Statistics ==========================
+ 
+------------------------- Data File Summary --------------------------
+  Creator: 
+  File   : C:\Users\abja\OneDrive - DHI\Scripts\github\myDevelopments\fast-mikeio\tests\Small_Vertical.dfsu
+  Title  : Output 3
+
+  Start date  Start time  Sets   Interval  Unit
+  2023-04-08    11:00:00    15       3600  second
+
+  Static items:
+  Item name            Item type               Minimum    Maximum Unit
+  Node id              Grid Codes                    1        153 Integer
+  X-coord              Latitude/longitude   -116.02031 -115.51333 degree
+  Y-coord              Latitude/longitude         11.9       11.9 degree
+  Z-coord              Item geometry 3-dime      -4270          0 meter
+  Code                 Grid Codes                    0          0 Integer
+  Element id           Grid Codes                    1        128 Integer
+  Element type         Grid Codes                   25         25 Integer
+  No of nodes          Grid Codes                    4          4 Integer
+  Connectivity         Grid Codes                    1        153 Integer
+
+  Dynamic items:
+  Item name            Item type               Minimum    Maximum Unit
+  Z coordinate         Item geometry 3-dime      -4270   0.433395 meter
+  Total SSC            Concentration_2               0          8 kg/meter^3
+----------------------------------------------------------------------
+ 
+======================================================================
+
+
+========================== Overall Timings ===========================
+  ------------------------------------------------------------------
+  Task                                      CPU time    Elapsed time
+  ------------------------------------------------------------------
+  Pre-processing                                0.00            0.10
+  Read data                                     0.00            0.00
+  Calculation                                   0.00            0.00
+  Write data                                    0.00            0.00
+  ------------------------------------------------------------------
+  Total                                         0.00            0.10
+  ------------------------------------------------------------------
+======================================================================
+
+
+============================ Memory Usage ============================
+  Peak memory usage (MB)                                       47.33
+======================================================================
+
+
+========================== Parallelization ===========================
+  Number of threads per subdomain : 12
+  Number of subdomains            : 1
+======================================================================
+ 
+  Number of warnings: 1
+ 
+  Normal run completion
