@@ -3,22 +3,23 @@ os.chdir(os.path.dirname(__file__))
 import fastmikeio
 import numpy as np
 from mikecore.DfsuFile import DfsuFile
+np.set_printoptions(suppress=True, formatter={'float_kind': '{:.6f}'.format})
 
-fast = fastmikeio.read("Small_3D.dfsu")
-print(fast.geometry.et.shape)
-fast.close()
+dfsu = DfsuFile.Open("Small_Vertical.dfsu")
 
-# dfsu = DfsuFile.Open("Vertical.dfsu")
-# for item in dfsu.ItemInfo:
-#     print(item.Name, item)
-# Z = dfsu.Z
-# print("\n\n\n")
-# print(Z.shape)
-# z_data_0 = dfsu.ReadItemTimeStep(1, 0).Data
-# z_data_1 = dfsu.ReadItemTimeStep(1, 1).Data
-# tss_data = dfsu.ReadItemTimeStep(2, 0).Data
-# print(z_data_0)
-# print(z_data_1)
-# dfsu.Close()
+X = dfsu.X
+Y = dfsu.Y
+Z = dfsu.Z
+
+print(Z)
 
 from mikecore.DfsuBuilder import DfsuBuilder, DfsuFileType
+
+
+# import mikeio
+# ds = mikeio.read("Small_3D.dfsu")
+# print(ds.geometry.element_coordinates[32])
+# et = ds.geometry.element_table
+# print(et[32])
+# nc = ds.geometry.node_coordinates
+# print(nc[et[32]])

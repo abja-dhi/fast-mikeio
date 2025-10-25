@@ -126,6 +126,15 @@ class DfsuGeometry:
     def n_layers(self):
         return self.dfsu.NumberOfLayers
     @property
+    def n_nodes(self):
+        return self.dfsu.NumberOfNodes
+    @property
+    def n_elements(self):
+        return self.dfsu.NumberOfElements
+    @property
+    def n_nodes2d(self):
+        return self.n_nodes // (self.n_layers + 1)
+    @property
     def X(self):
         return self.dfsu.X
     @property
@@ -140,7 +149,14 @@ class DfsuGeometry:
         zn = self.Z[0:(self.n_layers+1)]
         HAB = zn - zn[0]
         return HAB
-    
+    @property
+    def sigma_fraction(self):
+        z = self.nc[:, 2].reshape(self.n_nodes2d, self.n_layers + 1)
+        total_depth = z[:, -1] - z[:, 0]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            sigma = np.diff(z, axis=1) / total_depth[:, np.newaxis]
+            sigma[~np.isfinite(sigma)] = 0.0  # handle division by zero
+        return np.mean(sigma, axis=0)
     @property
     def et(self):
         return np.stack(self.dfsu.ElementTable, axis=1).T - 1
@@ -161,7 +177,22 @@ class DfsuGeometry:
         nc_2d = self.nc_2d[:, :2]
         ec = nc_2d[self.et_2d]
         return ec.mean(axis=1)
-
+    @property
+    def et_2d_3d(self):
+        n_layers = self.n_layers
+        bottom_layer_elements = self.et[::n_layers]  # every n_layers-th element is the bottom prism
+        return bottom_layer_elements[:, :3]  # get node indices in bottom layer
+    @property
+    def edges_2d(self):
+        et_2d = self.et_2d
+        edges = set()
+        for elem in et_2d:
+            n1, n2, n3 = elem
+            edge1 = tuple(sorted((n1, n2)))
+            edge2 = tuple(sorted((n2, n3)))
+            edge3 = tuple(sorted((n3, n1)))
+            edges.update([edge1, edge2, edge3])
+        return np.array(list(edges))
     @property
     def _tri2d(self) -> tri.Triangulation:
         return tri.Triangulation(self.nc_2d[:, 0], self.nc_2d[:, 1], self.et_2d)

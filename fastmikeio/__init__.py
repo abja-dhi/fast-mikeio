@@ -1,3 +1,3 @@
-from .fastmikeio import read
+from .fastmikeio import read, Dfsu
 
-__all__ = ['read']
+__all__ = ['read', 'Dfsu']
