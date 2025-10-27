@@ -12,6 +12,60 @@ import cycler
 from matplotlib.colors import LogNorm, Normalize
 import matplotlib.tri as tri
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mikecore.DfsFile import DfsFile
+from mikecore.DfsuBuilder import DfsuBuilder, DfsuFileType
+
+class Point:
+    def __init__(self, x, y, z=0):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def plot(self, ax):
+        ax.scatter(self.x, self.y, c='red')
+        return ax
+    
+    def distance(self, point):
+        return np.sqrt((self.x - point.x)**2 + (self.y - point.y)**2)
+
+    def __str__(self):
+        return f"Point({self.x}, {self.y}, {self.z})"
+    
+    def __repr__(self):
+        return f"Point({self.x}, {self.y}, {self.z})"
+
+class Line:
+    def __init__(self, p0: Point, p1: Point):
+        self.p0 = p0
+        self.p1 = p1
+        self.m = (p1.y - p0.y) / (p1.x - p0.x)
+        self.b = p0.y - self.m * p0.x
+
+    def get_intersect(self, line):
+        x = (line.b - self.b) / (self.m - line.m)
+        y = self.m * x + self.b
+        return Point(x, y)
+    
+    def contains(self, pt: Point, eps=1e-9):
+        if (min(self.p0.x, self.p1.x) - eps <= pt.x <= max(self.p0.x, self.p1.x) + eps and
+            min(self.p0.y, self.p1.y) - eps <= pt.y <= max(self.p0.y, self.p1.y) + eps):
+            return True
+        return False
+
+    def has_intersect(self, line):
+        if self.m == line.m:
+            return False  # Parallel lines
+        inter_pt = self.get_intersect(line)
+        if self.contains(inter_pt) and line.contains(inter_pt):
+            return True
+        return False
+    
+    def plot(self, ax):
+        ax.plot([self.p0.x, self.p1.x], [self.p0.y, self.p1.y], c='blue')
+        return ax
+    
+    def __str__(self):
+        return f"Line({self.p0}, {self.p1})"
 
 class MatplotlibShell:
     
@@ -230,6 +284,84 @@ class DfsuGeometry:
         """Find the index of the closest element to a given point in 2D space"""
         distances = np.sqrt(np.sum((self.geometry.ec_2d - point)**2, axis=1))
         return np.argmin(distances)
+    
+    @staticmethod
+    def _tri_edges_sorted(tris):
+        e12 = np.sort(tris[:, [0, 1]], axis=1)
+        e23 = np.sort(tris[:, [1, 2]], axis=1)
+        e31 = np.sort(tris[:, [2, 0]], axis=1)
+        return np.stack([e12, e23, e31], axis=1)  # (ntri, 3, 2)
+
+    def get_intersection_nodes(self, p0: Point, p1: Point):
+        cross_line = Line(p0, p1)
+        nc = self.nc
+        et = self.et
+        n_layers = self.n_layers
+        bottom_triangles = et[::n_layers, :3]
+        edges = set()
+        for tri in bottom_triangles:
+            n1, n2, n3 = tri
+            edge1 = tuple(sorted((n1, n2)))
+            edge2 = tuple(sorted((n2, n3)))
+            edge3 = tuple(sorted((n3, n1)))
+            edges.update([edge1, edge2, edge3])
+        edges = np.array(list(edges))
+        intersections = []
+        for edge in edges:
+            p1 = Point(nc[edge[0],0], nc[edge[0],1], nc[edge[0],2])
+            p2 = Point(nc[edge[1],0], nc[edge[1],1], nc[edge[1],2])
+            line = Line(p1, p2)
+            if not line.has_intersect(cross_line):
+                continue
+            intersect = line.get_intersect(cross_line)
+            d1 = p1.distance(intersect)
+            d2 = p2.distance(intersect)
+            intersect.z = (p1.z * d2 + p2.z * d1) / (d1 + d2)
+            data = {'point': intersect, 'p1': edge[0], 'dist1': d1, 'p2': edge[1], 'dist2': d2}
+            intersections.append(data)
+        intersections.sort(key=lambda item: p0.distance(item['point']))
+        return intersections
+
+    def get_intersection_elements(self, p0: Point, p1: Point, intersections):
+        n_layers = self.n_layers
+        et = self.et
+        nc = self.nc
+        bottom_elements = et[::n_layers]
+        bottom_triangles = bottom_elements[:, :3]
+        edges = {}
+        for tri in range(len(bottom_triangles)):
+            n1, n2, n3 = bottom_triangles[tri]
+            edge1 = tuple(sorted((n1, n2)))
+            edge2 = tuple(sorted((n2, n3)))
+            edge3 = tuple(sorted((n3, n1)))
+            edges[tri] = [edge1, edge2, edge3]
+        elements = []
+        for item in intersections:
+            p1 = item['p1']
+            p2 = item['p2']
+            edge = tuple(sorted((p1, p2)))
+            elem_indices = []
+            for tri, tri_edges in edges.items():
+                if edge in tri_edges:
+                    elem_indices.append(tri)
+            for elem in elem_indices:
+                if elem not in elements:
+                    elements.append(elem)
+        distances = []
+        for elem in elements:
+            n1 = bottom_triangles[elem, 0]
+            n2 = bottom_triangles[elem, 1]
+            n3 = bottom_triangles[elem, 2]
+            center = Point(
+                (nc[n1,0] + nc[n2,0] + nc[n3,0]) / 3,
+                (nc[n1,1] + nc[n2,1] + nc[n3,1]) / 3,
+                (nc[n1,2] + nc[n2,2] + nc[n3,2]) / 3,
+            )
+            dist = p0.distance(center)
+            distances.append(dist)
+        sorted_indices = np.argsort(distances)
+        elements = [elements[i] for i in sorted_indices]
+        return elements
 
 class DfsuStatistics:
     def __init__(self, dfsu):
@@ -485,16 +617,86 @@ class Dfsu:
     def to_mesh(self, fname):
         self.geometry.to_mesh(fname)
 
-    def vertical_extractor(self, x, y, items=None, times=None):
-        x = np.array(x).flatten()
-        y = np.array(y).flatten()
-        finder = self.geometry._tri2d.get_trifinder()
-        elements_2d = finder(x, y)
+    def vertical_extractor(self, x, y, output_filename=None):
+        p0 = Point(x[0], y[0], 0)
+        p1 = Point(x[1], y[1], 0)
         n_layers = self.geometry.n_layers
-        elements = np.array([np.arange(i * n_layers, (i + 1) * n_layers) for i in elements_2d])
-        data = self.get_data(item_idx=items, time_idx=times, reshape=False)
-        vertical_data = data[:, :, elements]
-        return vertical_data
+        intersections = self.geometry.get_intersection_nodes(p0, p1)
+        elements = self.geometry.get_intersection_elements(p0, p1, intersections)
+        nodes_l = []
+        nodes_r = []
+        weights_l = []
+        weights_r = []
+        for i in range(len(intersections)):
+            p1 = intersections[i]['p1']
+            p2 = intersections[i]['p2']
+            d1 = intersections[i]['dist1']
+            d2 = intersections[i]['dist2']
+            total_d = d1 + d2
+            for l in range(n_layers + 1):
+                nodes_l.append(p1 + l)
+                nodes_r.append(p2 + l)
+                weights_l.append(d2 / total_d)
+                weights_r.append(d1 / total_d)
+        nodes_l = np.array(nodes_l)
+        nodes_r = np.array(nodes_r)
+        weights_l = np.array(weights_l)
+        weights_r = np.array(weights_r)
+        
+        X = np.repeat([pt['point'].x for pt in intersections], self.geometry.n_layers+1).flatten()
+        Y = np.repeat([pt['point'].y for pt in intersections], self.geometry.n_layers+1).flatten()
+        z = self.geometry.Z
+        Z = z[nodes_l] * weights_l + z[nodes_r] * weights_r
+        
+        et = []
+        for i in range(len(intersections)-1):
+            offset1 = i * (n_layers + 1)
+            offset2 = (i+1) * (n_layers + 1)
+            for l in range(n_layers):
+                n1 = offset1 + l
+                n2 = offset2 + l
+                n3 = offset2 + l + 1
+                n4 = offset1 + l + 1
+                et.append([n1, n2, n3, n4])
+        et = np.array(et) + 1  # 1-based indexing
+        element_indices = []
+        for elem in elements:
+            for l in range(n_layers):
+                element_indices.append(elem*n_layers + l)
+        element_indices = np.array(element_indices)
+        
+        
+        builder = DfsuBuilder.Create(DfsuFileType.DfsuVerticalProfileSigma)
+        builder.FileTitle = self.dfsu.FileTitle + " - Vertical Profile"
+        builder.SetProjection(self.dfsu.Projection)
+        builder.SetNodes(X, Y, Z, np.zeros_like(X, dtype=np.int32))
+        builder.SetElements(et)
+        builder.DeleteValueByte = DfsFile.DefaultDeleteValueByte
+        builder.DeleteValueDouble = DfsFile.DefaultDeleteValueDouble
+        builder.DeleteValueFloat = DfsFile.DefaultDeleteValueFloat
+        builder.DeleteValueInt = DfsFile.DefaultDeleteValueInt
+        builder.DeleteValueUnsignedInt = DfsFile.DefaultDeleteValueUnsignedInt
+
+        builder.SetZUnit(self.dfsu.ZUnit)
+        builder.SetNumberOfSigmaLayers(self.dfsu.NumberOfSigmaLayers)
+        builder.SetTimeInfo(self.dfsu.StartDateTime, self.dfsu.TimeStepInSeconds)
+
+        for i in range(1, len(self.dfsu.ItemInfo)):
+            itemInfo = self.dfsu.ItemInfo[i]
+            builder.AddDynamicItem(itemInfo.Name, itemInfo.Quantity)
+        if output_filename is None:
+            output_filename = self.filename.replace(".dfsu", "_vertical_profile.dfsu")
+        file = builder.CreateFile(output_filename)
+
+        for t in range(self.n_timesteps):
+            z_dynamic = self.dfsu.ReadItemTimeStep(1, t).Data
+            z_vals = z_dynamic[nodes_l] * weights_l + z_dynamic[nodes_r] * weights_r
+            file.WriteItemTimeStep(1, t, t, z_vals.astype(np.float32))
+            for i in range(1, len(self.dfsu.ItemInfo)):
+                data = self.dfsu.ReadItemTimeStep(i+1, t).Data
+                data_vals = data[element_indices]
+                file.WriteItemTimeStep(i+1, t, t, data_vals.astype(np.float32))
+        file.Close()
 
     def get_data(self, item_idx=None, time_idx=None, layer_idx=None, reshape=True):
         """
@@ -596,32 +798,4 @@ def read(filename, unit_conversion=1):
 
 
 if __name__ == "__main__":
-    import os
-    os.chdir(os.path.dirname(__file__))
-    fname = r"\\usden1-stor2\projects\41807449_WS\Models\HD\Setup\Production\Scenario_2b-delay_half_spill\DRT_HD_MT_scenario_2b-delay_half_spill.m3fm - Result Files\3d_mt.dfsu"
-    dfsu = read(fname, unit_conversion=1000)
-    # quantile = dfsu.statistics.quantile(q=0.95, item_idx=5, layer_idx=0)
-    # print(np.max(quantile), np.min(quantile))
-    levels = np.logspace(np.log10(0.01), np.log10(10), 100)
-    cbar_levels = [0.01, 0.1, 1, 10]
-    item_idx = 5
-    layer_idx = 0
-    xlabel = "Easting (m)"
-    ylabel = "Northing (m)"
-    cbar_label = "SSC (mg/L)"
-    extend = 'max'
-    
-    ax = dfsu.plot.min(item_idx=item_idx, layer_idx=layer_idx, levels=levels, cbar_levels=cbar_levels, show_mesh=False, xlabel=xlabel, ylabel=ylabel, title="95th Percentile of SSC (mg/L)", cbar_label=cbar_label, extend=extend)
-    fig = ax.get_figure()
-    fig.savefig("0-Min.png", dpi=300, bbox_inches='tight')
-    ax = dfsu.plot.mean(item_idx=item_idx, layer_idx=layer_idx, levels=levels, cbar_levels=cbar_levels, show_mesh=False, xlabel=xlabel, ylabel=ylabel, title="95th Percentile of SSC (mg/L)", cbar_label=cbar_label, extend=extend)
-    fig = ax.get_figure()
-    fig.savefig("1-Mean.png", dpi=300, bbox_inches='tight')
-    ax = dfsu.plot.quantile(q=0.95, item_idx=item_idx, layer_idx=layer_idx, levels=levels, cbar_levels=cbar_levels, show_mesh=False, xlabel=xlabel, ylabel=ylabel, title="95th Percentile of SSC (mg/L)", cbar_label=cbar_label, extend=extend)
-    fig = ax.get_figure()
-    fig.savefig("2-0.95.png", dpi=300, bbox_inches='tight')
-    ax = dfsu.plot.max(item_idx=item_idx, layer_idx=layer_idx, levels=levels, cbar_levels=cbar_levels, show_mesh=False, xlabel=xlabel, ylabel=ylabel, title="95th Percentile of SSC (mg/L)", cbar_label=cbar_label, extend=extend)
-    fig = ax.get_figure()
-    fig.savefig("3-Max.png", dpi=300, bbox_inches='tight')
-    # plt.show()
-    dfsu.close()
+    pass

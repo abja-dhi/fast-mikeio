@@ -15,7 +15,8 @@ print(Z)
 
 from mikecore.DfsuBuilder import DfsuBuilder, DfsuFileType
 
-
+ec = dfsu.CalculateElementCenterCoordinates()
+print(len(ec[0]))
 # import mikeio
 # ds = mikeio.read("Small_3D.dfsu")
 # print(ds.geometry.element_coordinates[32])
