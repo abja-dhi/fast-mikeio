@@ -14,6 +14,7 @@ import matplotlib.tri as tri
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mikecore.DfsFile import DfsFile
 from mikecore.DfsuBuilder import DfsuBuilder, DfsuFileType
+from collections import defaultdict
 
 class Point:
     def __init__(self, x, y, z=0):
@@ -292,76 +293,200 @@ class DfsuGeometry:
         e31 = np.sort(tris[:, [2, 0]], axis=1)
         return np.stack([e12, e23, e31], axis=1)  # (ntri, 3, 2)
 
+    @staticmethod
+    def _line_coeffs(p0, p1):
+        # ax + by + c = 0  (robust for vertical/horizontal lines)
+        a = p0.y - p1.y
+        b = p1.x - p0.x
+        c = p0.x * p1.y - p1.x * p0.y
+        return a, b, c
+
+    @staticmethod
+    def _segment_line_intersections(PA, PB, a, b, c, rtol=1e-12):
+        # Signed distances of endpoints from line
+        sA = a * PA[:, 0] + b * PA[:, 1] + c
+        sB = a * PB[:, 0] + b * PB[:, 1] + c
+
+        # Select segments that straddle/intersect the infinite line (exclude fully colinear)
+        colinear = (np.abs(sA) <= rtol) & (np.abs(sB) <= rtol)
+        mask = (sA * sB <= 0.0) & (~colinear)
+        if not np.any(mask):
+            return (np.empty((0, 2)), np.empty((0,)), np.empty((0,)), np.empty((0,), dtype=int))
+
+        sA = sA[mask]; sB = sB[mask]
+        PA = PA[mask]; PB = PB[mask]
+        idx = np.nonzero(mask)[0]
+
+        # Parametric position along segment (clipped to [0,1] for numerical safety)
+        t = np.clip(sA / (sA - sB), 0.0, 1.0)
+        P = PA + (PB - PA) * t[:, None]
+
+        # Distances from intersection to endpoints
+        d1 = np.linalg.norm(P - PA, axis=1)
+        d2 = np.linalg.norm(P - PB, axis=1)
+        return P, d1, d2, idx
+
     def get_intersection_nodes(self, p0: Point, p1: Point):
         cross_line = Line(p0, p1)
+        cross_a, cross_b, cross_c = self._line_coeffs(p0, p1)
         nc = self.nc
         et = self.et
         n_layers = self.n_layers
         bottom_triangles = et[::n_layers, :3]
-        edges = set()
-        for tri in bottom_triangles:
-            n1, n2, n3 = tri
-            edge1 = tuple(sorted((n1, n2)))
-            edge2 = tuple(sorted((n2, n3)))
-            edge3 = tuple(sorted((n3, n1)))
-            edges.update([edge1, edge2, edge3])
-        edges = np.array(list(edges))
-        intersections = []
-        for edge in edges:
-            p1 = Point(nc[edge[0],0], nc[edge[0],1], nc[edge[0],2])
-            p2 = Point(nc[edge[1],0], nc[edge[1],1], nc[edge[1],2])
-            line = Line(p1, p2)
-            if not line.has_intersect(cross_line):
-                continue
-            intersect = line.get_intersect(cross_line)
-            d1 = p1.distance(intersect)
-            d2 = p2.distance(intersect)
-            intersect.z = (p1.z * d2 + p2.z * d1) / (d1 + d2)
-            data = {'point': intersect, 'p1': edge[0], 'dist1': d1, 'p2': edge[1], 'dist2': d2}
-            intersections.append(data)
-        intersections.sort(key=lambda item: p0.distance(item['point']))
+        edges = np.unique(self._tri_edges_sorted(bottom_triangles).reshape(-1, 2), axis=0)
+        
+        PA_xy = nc[edges[:, 0], :2]
+        PB_xy = nc[edges[:, 1], :2]
+        P_xy, d1, d2, valid_idx = self._segment_line_intersections(PA_xy, PB_xy, cross_a, cross_b, cross_c)
+        if P_xy.shape[0] == 0:
+            return []
+        
+        # Sort along cross line by distance from p0
+        p0_xy = np.array([p0.x, p0.y])
+        order = np.argsort(np.linalg.norm(P_xy - p0_xy, axis=1))
+
+        P_xy = P_xy[order]
+        d1   = d1[order]
+        d2   = d2[order]
+        eord = edges[valid_idx][order]
+
+        # Build the exact same output structure you use downstream
+        intersections = [
+            {'point': Point(float(P_xy[i, 0]), float(P_xy[i, 1])),
+            'p1': int(eord[i, 0]), 'dist1': float(d1[i]),
+            'p2': int(eord[i, 1]), 'dist2': float(d2[i])}
+            for i in range(P_xy.shape[0])
+        ]
         return intersections
 
     def get_intersection_elements(self, p0: Point, p1: Point, intersections):
         n_layers = self.n_layers
         et = self.et
         nc = self.nc
-        bottom_elements = et[::n_layers]
-        bottom_triangles = bottom_elements[:, :3]
-        edges = {}
-        for tri in range(len(bottom_triangles)):
-            n1, n2, n3 = bottom_triangles[tri]
-            edge1 = tuple(sorted((n1, n2)))
-            edge2 = tuple(sorted((n2, n3)))
-            edge3 = tuple(sorted((n3, n1)))
-            edges[tri] = [edge1, edge2, edge3]
-        elements = []
-        for item in intersections:
-            p1 = item['p1']
-            p2 = item['p2']
-            edge = tuple(sorted((p1, p2)))
-            elem_indices = []
-            for tri, tri_edges in edges.items():
-                if edge in tri_edges:
-                    elem_indices.append(tri)
-            for elem in elem_indices:
-                if elem not in elements:
-                    elements.append(elem)
-        distances = []
-        for elem in elements:
-            n1 = bottom_triangles[elem, 0]
-            n2 = bottom_triangles[elem, 1]
-            n3 = bottom_triangles[elem, 2]
-            center = Point(
-                (nc[n1,0] + nc[n2,0] + nc[n3,0]) / 3,
-                (nc[n1,1] + nc[n2,1] + nc[n3,1]) / 3,
-                (nc[n1,2] + nc[n2,2] + nc[n3,2]) / 3,
-            )
-            dist = p0.distance(center)
-            distances.append(dist)
-        sorted_indices = np.argsort(distances)
-        elements = [elements[i] for i in sorted_indices]
+        bottom_triangles = et[::n_layers, :3]
+        ntri = bottom_triangles.shape[0]
+        tri_edges = self._tri_edges_sorted(bottom_triangles)  # (ntri,3,2)
+        E = tri_edges.reshape(-1, 2)                # (ntri*3,2)
+        tri_ids = np.repeat(np.arange(ntri, dtype=int), 3)
+
+        max_node = int(nc.shape[0]) + 1
+        keys = (E[:, 0].astype(np.int64) * max_node + E[:, 1].astype(np.int64))
+
+        edge_to_tris = defaultdict(list)
+        for k, t in zip(keys, tri_ids):
+            edge_to_tris[k].append(t)
+
+        # Collect all triangle indices that contain any intersected edge
+        if len(intersections) == 0:
+            return []
+
+        inter_edges = np.array(
+            [tuple(sorted((item['p1'], item['p2']))) for item in intersections],
+            dtype=int
+        )
+        inter_keys = (inter_edges[:, 0].astype(np.int64) * max_node + inter_edges[:, 1].astype(np.int64))
+
+        elems = set()
+        for k in inter_keys:
+            if k in edge_to_tris:
+                elems.update(edge_to_tris[k])
+        if not elems:
+            return []
+
+        elems = np.fromiter(elems, dtype=int)
+
+        # Sort elements by distance of their centroid to p0
+        n1 = bottom_triangles[elems, 0]
+        n2 = bottom_triangles[elems, 1]
+        n3 = bottom_triangles[elems, 2]
+
+        centers = np.column_stack((
+            (nc[n1, 0] + nc[n2, 0] + nc[n3, 0]) / 3.0,
+            (nc[n1, 1] + nc[n2, 1] + nc[n3, 1]) / 3.0
+        ))
+        p0_xy = np.array([p0.x, p0.y])
+        order = np.argsort(np.linalg.norm(centers - p0_xy, axis=1))
+        elements = [int(e) for e in elems[order]]
         return elements
+
+    def get_intersections_and_elements(self, p0: Point, p1: Point):
+        """
+        Get intersection points and intersected elements between line p0-p1 and mesh
+        Returns:
+        --------
+        P_xy : np.ndarray
+            Array of intersection points (x,y)
+        eord : np.ndarray
+            Array of intersected edges (node indices) in 3D mesh
+        d1 : np.ndarray
+            Distances from intersection points to first node of each edge
+        d2 : np.ndarray
+            Distances from intersection points to second node of each edge
+        elements : np.ndarray
+            Array of intersected element indices in 2D mesh
+        """
+        cross_a, cross_b, cross_c = self._line_coeffs(p0, p1)
+
+        et = self.et
+        nc = self.nc
+        n_layers = self.n_layers
+
+        bottom_tris = et[::n_layers, :3]
+        ntri = bottom_tris.shape[0]
+
+        # Unique edges (for intersections)
+        edges_all = self._tri_edges_sorted(bottom_tris).reshape(-1, 2)
+        edges_unique = np.unique(edges_all, axis=0)
+
+        # Intersections
+        PA_xy = nc[edges_unique[:, 0], :2]
+        PB_xy = nc[edges_unique[:, 1], :2]
+        P_xy, d1, d2, valid_idx = self._segment_line_intersections(PA_xy, PB_xy, cross_a, cross_b, cross_c)
+        if P_xy.shape[0] == 0:
+            return [], []
+
+        p0_xy = np.array([p0.x, p0.y])
+        order_int = np.argsort(np.linalg.norm(P_xy - p0_xy, axis=1))
+        P_xy = P_xy[order_int]
+        d1 = d1[order_int]
+        d2 = d2[order_int]
+        eord = edges_unique[valid_idx][order_int]
+        
+
+        # Edge -> triangles map (for elements)
+        tri_edges = self._tri_edges_sorted(bottom_tris)  # (ntri,3,2)
+        E = tri_edges.reshape(-1, 2)
+        tri_ids = np.repeat(np.arange(ntri, dtype=int), 3)
+
+        max_node = int(nc.shape[0]) + 1
+        keys_all = (E[:, 0].astype(np.int64) * max_node + E[:, 1].astype(np.int64))
+        edge_to_tris = defaultdict(list)
+        for k, t in zip(keys_all, tri_ids):
+            edge_to_tris[k].append(t)
+
+        inter_edges = eord
+        inter_keys = (inter_edges[:, 0].astype(np.int64) * max_node + inter_edges[:, 1].astype(np.int64))
+
+        elems = set()
+        for k in inter_keys:
+            if k in edge_to_tris:
+                elems.update(edge_to_tris[k])
+        if not elems:
+            return P_xy, eord, d1, d2, []
+
+        elems = np.fromiter(elems, dtype=int)
+
+        n1 = bottom_tris[elems, 0]
+        n2 = bottom_tris[elems, 1]
+        n3 = bottom_tris[elems, 2]
+        centers = np.column_stack((
+            (nc[n1, 0] + nc[n2, 0] + nc[n3, 0]) / 3.0,
+            (nc[n1, 1] + nc[n2, 1] + nc[n3, 1]) / 3.0
+        ))
+        order_el = np.argsort(np.linalg.norm(centers - p0_xy, axis=1))
+        elements = np.array([int(e) for e in elems[order_el]])
+
+        return P_xy, eord, d1, d2, elements
 
 class DfsuStatistics:
     def __init__(self, dfsu):
@@ -621,51 +746,42 @@ class Dfsu:
         p0 = Point(x[0], y[0], 0)
         p1 = Point(x[1], y[1], 0)
         n_layers = self.geometry.n_layers
-        intersections = self.geometry.get_intersection_nodes(p0, p1)
-        elements = self.geometry.get_intersection_elements(p0, p1, intersections)
-        nodes_l = []
-        nodes_r = []
-        weights_l = []
-        weights_r = []
-        for i in range(len(intersections)):
-            p1 = intersections[i]['p1']
-            p2 = intersections[i]['p2']
-            d1 = intersections[i]['dist1']
-            d2 = intersections[i]['dist2']
-            total_d = d1 + d2
-            for l in range(n_layers + 1):
-                nodes_l.append(p1 + l)
-                nodes_r.append(p2 + l)
-                weights_l.append(d2 / total_d)
-                weights_r.append(d1 / total_d)
-        nodes_l = np.array(nodes_l)
-        nodes_r = np.array(nodes_r)
-        weights_l = np.array(weights_l)
-        weights_r = np.array(weights_r)
-        
-        X = np.repeat([pt['point'].x for pt in intersections], self.geometry.n_layers+1).flatten()
-        Y = np.repeat([pt['point'].y for pt in intersections], self.geometry.n_layers+1).flatten()
+        # Find intersection points and intersected elements
+        P_xy, eord, d1, d2, elements = self.geometry.get_intersections_and_elements(p0, p1)
+        p1 = eord[:, 0]
+        p2 = eord[:, 1]
+        total_d = d1 + d2
+        layers = np.arange(n_layers + 1)
+        nodes_l = (p1[:, None] + layers).ravel()
+        nodes_r = (p2[:, None] + layers).ravel()
+        wl = (d2 / total_d)[:, None]
+        wr = (d1 / total_d)[:, None]
+
+        weights_l = np.repeat(wl, n_layers + 1, axis=1).ravel()
+        weights_r = np.repeat(wr, n_layers + 1, axis=1).ravel()
+        # Build node coordinates for the elements in the vertical profile dfsu file
+        X = np.repeat(P_xy[:, 0], self.geometry.n_layers+1).flatten()
+        Y = np.repeat(P_xy[:, 1], self.geometry.n_layers+1).flatten()
         z = self.geometry.Z
         Z = z[nodes_l] * weights_l + z[nodes_r] * weights_r
         
-        et = []
-        for i in range(len(intersections)-1):
-            offset1 = i * (n_layers + 1)
-            offset2 = (i+1) * (n_layers + 1)
-            for l in range(n_layers):
-                n1 = offset1 + l
-                n2 = offset2 + l
-                n3 = offset2 + l + 1
-                n4 = offset1 + l + 1
-                et.append([n1, n2, n3, n4])
-        et = np.array(et) + 1  # 1-based indexing
-        element_indices = []
-        for elem in elements:
-            for l in range(n_layers):
-                element_indices.append(elem*n_layers + l)
-        element_indices = np.array(element_indices)
+        # Build element table for vertical profile dfsu file
+        n_int = P_xy.shape[0]
+        n_per_col = n_layers + 1
+        i = np.arange(n_int - 1)[:, None]
+        l = np.arange(n_layers)[None, :]
+        offset1 = i * n_per_col
+        offset2 = (i + 1) * n_per_col
+        n1 = offset1 + l
+        n2 = offset2 + l
+        n3 = offset2 + l + 1
+        n4 = offset1 + l + 1
+        et = np.stack([n1, n2, n3, n4], axis=-1).reshape(-1, 4) + 1  # 1-based indexing
+
+        # Extract the element indices in the original dfsu file to be used for data extraction
+        element_indices = (elements[:, None] * n_layers + np.arange(n_layers)).ravel()
         
-        
+        # Build the new dfsu file
         builder = DfsuBuilder.Create(DfsuFileType.DfsuVerticalProfileSigma)
         builder.FileTitle = self.dfsu.FileTitle + " - Vertical Profile"
         builder.SetProjection(self.dfsu.Projection)

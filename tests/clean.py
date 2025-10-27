@@ -19,7 +19,12 @@ from scipy.interpolate import griddata
 
 
 if __name__ == "__main__":
-    dfsu = fastmikeio.read("3D.dfsu")
-    x = [-117.2482047163, -117.2464082003]
-    y = [10.33932763618, 10.53730369851]
-    dfsu.vertical_extractor(x, y, output_filename="3D_vertical_profile_test.dfsu")
+    # dfsu = fastmikeio.read("3D.dfsu")
+    # x = [-117.2482047163, -117.2464082003]
+    # y = [10.33932763618, 10.53730369851]
+    # dfsu.vertical_extractor(x, y, output_filename="3D_vertical_profile_test.dfsu")
+
+    dfsu = fastmikeio.read("Small_3D.dfsu")
+    x = [-116.05, -115.5]
+    y = [11.9, 11.9]
+    dfsu.vertical_extractor(x, y, output_filename="Small_3D_vertical_profile_test.dfsu")
