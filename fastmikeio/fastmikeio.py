@@ -68,6 +68,64 @@ class Line:
     def __str__(self):
         return f"Line({self.p0}, {self.p1})"
 
+class Polygon:
+    def __init__(self, inputs):
+        if isinstance(inputs[0], Point):
+            self.vertices = inputs
+            edges = []
+            for i in range(len(inputs)):
+                p0 = inputs[i]
+                p1 = inputs[(i + 1) % len(inputs)]
+                edges.append(Line(p0, p1))
+            self.edges = edges
+        else:
+            self.edges = inputs
+            self.vertices = []
+            for edge in inputs:
+                self.vertices.append(edge.p0)
+        
+    def get_intersects(self, line):
+        intersect_pts = []
+        for edge in self.edges:
+            if edge.has_intersect(line):
+                inter_pt = edge.get_intersect(line)
+                intersect_pts.append(inter_pt)
+        return intersect_pts
+    
+    def has_intersect(self, line):
+        for edge in self.edges:
+            if edge.has_intersect(line):
+                return True
+        return False
+    
+    def contains(self, point):
+        # Ray casting algorithm to determine if point is inside polygon
+        x, y = point.x, point.y
+        n = len(self.vertices)
+        inside = False
+
+        p1x, p1y = self.vertices[0].x, self.vertices[0].y
+        for i in range(1, n + 1):
+            p2x, p2y = self.vertices[i % n].x, self.vertices[i % n].y
+            if y > min(p1y, p2y):
+                if y <= max(p1y, p2y):
+                    if x <= max(p1x, p2x):
+                        if p1y != p2y:
+                            xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                        if p1x == p2x or x <= xinters:
+                            inside = not inside
+            p1x, p1y = p2x, p2y
+
+        return inside
+    
+    def plot(self, ax):
+        for edge in self.edges:
+            edge.plot(ax)
+        return ax
+    
+    def __str__(self):
+        return f"Polygon({self.vertices})"
+
 class MatplotlibShell:
     
     class dhi_colors:
@@ -286,46 +344,6 @@ class DfsuGeometry:
         distances = np.sqrt(np.sum((self.geometry.ec_2d - point)**2, axis=1))
         return np.argmin(distances)
     
-    @staticmethod
-    def _tri_edges_sorted(tris):
-        e12 = np.sort(tris[:, [0, 1]], axis=1)
-        e23 = np.sort(tris[:, [1, 2]], axis=1)
-        e31 = np.sort(tris[:, [2, 0]], axis=1)
-        return np.stack([e12, e23, e31], axis=1)  # (ntri, 3, 2)
-
-    @staticmethod
-    def _line_coeffs(p0, p1):
-        # ax + by + c = 0  (robust for vertical/horizontal lines)
-        a = p0.y - p1.y
-        b = p1.x - p0.x
-        c = p0.x * p1.y - p1.x * p0.y
-        return a, b, c
-
-    @staticmethod
-    def _segment_line_intersections(PA, PB, a, b, c, rtol=1e-12):
-        # Signed distances of endpoints from line
-        sA = a * PA[:, 0] + b * PA[:, 1] + c
-        sB = a * PB[:, 0] + b * PB[:, 1] + c
-
-        # Select segments that straddle/intersect the infinite line (exclude fully colinear)
-        colinear = (np.abs(sA) <= rtol) & (np.abs(sB) <= rtol)
-        mask = (sA * sB <= 0.0) & (~colinear)
-        if not np.any(mask):
-            return (np.empty((0, 2)), np.empty((0,)), np.empty((0,)), np.empty((0,), dtype=int))
-
-        sA = sA[mask]; sB = sB[mask]
-        PA = PA[mask]; PB = PB[mask]
-        idx = np.nonzero(mask)[0]
-
-        # Parametric position along segment (clipped to [0,1] for numerical safety)
-        t = np.clip(sA / (sA - sB), 0.0, 1.0)
-        P = PA + (PB - PA) * t[:, None]
-
-        # Distances from intersection to endpoints
-        d1 = np.linalg.norm(P - PA, axis=1)
-        d2 = np.linalg.norm(P - PB, axis=1)
-        return P, d1, d2, idx
-
     def get_intersection_nodes(self, p0: Point, p1: Point):
         cross_line = Line(p0, p1)
         nc = self.nc
@@ -333,8 +351,23 @@ class DfsuGeometry:
         n_layers = self.n_layers
         bottom_triangles = et[::n_layers, :3]
         edges = defaultdict(list)
+        start_elem = None
+        end_elem = None
+        found_start = False
+        found_end = False
         for t, tri in enumerate(bottom_triangles):
             n1, n2, n3 = tri
+            current_elem = Polygon([Point(nc[n1,0], nc[n1,1], nc[n1,2]),
+                                    Point(nc[n2,0], nc[n2,1], nc[n2,2]),
+                                    Point(nc[n3,0], nc[n3,1], nc[n3,2])])
+            if not found_start:
+                if current_elem.contains(p0):
+                    start_elem = (t, tri)
+                    found_start = True
+            if not found_end:
+                if current_elem.contains(p1):
+                    end_elem = (t, tri)
+                    found_end = True
             edge1 = tuple(sorted((n1, n2)))
             edge2 = tuple(sorted((n2, n3)))
             edge3 = tuple(sorted((n3, n1)))
@@ -659,7 +692,7 @@ class Dfsu:
         X = np.repeat([pt.x for pt in intersections], self.geometry.n_layers+1).flatten()
         Y = np.repeat([pt.y for pt in intersections], self.geometry.n_layers+1).flatten()
         z = self.geometry.Z
-        Z = z[nodes_l] * weights_l + z[nodes_r] * weights_r
+        Z = z[nodes_l] * weights_r + z[nodes_r] * weights_l
         
         et = []
         for i in trange(len(intersections)-1, desc="Creating element table"):
@@ -703,7 +736,7 @@ class Dfsu:
 
         for t in trange(self.n_timesteps, desc="Writing time steps"):
             z_dynamic = self.dfsu.ReadItemTimeStep(1, t).Data
-            z_vals = z_dynamic[nodes_l] * weights_l + z_dynamic[nodes_r] * weights_r
+            z_vals = z_dynamic[nodes_l] * weights_r + z_dynamic[nodes_r] * weights_l
             file.WriteItemTimeStep(1, t, t, z_vals.astype(np.float32))
             for i in range(1, len(self.dfsu.ItemInfo)):
                 data = self.dfsu.ReadItemTimeStep(i+1, t).Data
