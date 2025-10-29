@@ -55,10 +55,10 @@ class Dfsu:
             for i_time, t in enumerate(trange(len(time_idx), desc="Time steps", leave=False)):
                 t = time_idx[t]
                 if not reshape:
-                    full_data = self.dfsu.ReadItemTimeStep(itm + 2, t).Data
+                    full_data = self.dfsu.ReadItemTimeStep(itm + 1, t).Data
                     data[i_item, i_time, :] = full_data
                 else:
-                    full_data = self.dfsu.ReadItemTimeStep(itm + 2, t).Data.reshape((n2d, n_layers))
+                    full_data = self.dfsu.ReadItemTimeStep(itm + 1, t).Data.reshape((n2d, n_layers))
                     sel = full_data[:, layer_idx]
                     data[i_item, i_time, :, :] = sel.T
         data *= self.unit_conversion
@@ -203,7 +203,7 @@ class Dfsu3DSigma(Dfsu):
                 file.WriteItemTimeStep(i+1, t, t, data_vals.astype(np.float32))
         file.Close()
 
-        return DfsuVerticalProfileSigma(output_filename)
+        return DfsuVerticalProfileSigma(output_filename, unit_conversion=self.unit_conversion)
 
     
 class DfsuVerticalProfileSigma(Dfsu):

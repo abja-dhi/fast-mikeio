@@ -7,3 +7,5 @@ examples/
 /fastmikeio/__init__*
 !/fastmikeio/__init__.py
 *.dfsu
+dist/
+*.toml

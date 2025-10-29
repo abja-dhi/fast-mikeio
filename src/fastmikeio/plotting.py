@@ -76,30 +76,16 @@ class MatplotlibShell:
     mpl.rcParams['ytick.direction'] = 'in'
 
     def subplots(**kwargs):
-        if kwargs.get('figheight'): figheight = kwargs.get('figheight')
-        else: figheight = 4.25*(1+(5**.5))/2
-        
-        if kwargs.get('figwidth'): figwidth = kwargs.get('figwidth')
-        else: figwidth = figheight
-        
-        if kwargs.get('nrow'): nrow = kwargs.get('nrow')
-        else: nrow = 1
-        
-        if kwargs.get('ncol'): ncol = kwargs.get('ncol')
-        else: ncol = 1    
-        
-        if kwargs.get('sharex'): sharex = kwargs.get('sharex')
-        else: sharex = False   
-        
-        if kwargs.get('sharey'): sharey = kwargs.get('sharey')
-        else: sharey = False 
-        
-        if kwargs.get('width_ratios'): width_ratios = kwargs.get('width_ratios')
-        else: width_ratios = [1]*ncol
-
-        if kwargs.get('height_ratios'): height_ratios = kwargs.get('height_ratios')
-        else: height_ratios = [1]*nrow   
-        
+        figheight = kwargs.get('figheight', 10)
+        figwidth = kwargs.get('figwidth', 14)
+        figheight = figheight / 2.54  # Convert cm to inches
+        figwidth = figwidth / 2.54   # Convert cm to inches
+        nrow = kwargs.get('nrow', 1)
+        ncol = kwargs.get('ncol', 1)
+        sharex = kwargs.get('sharex', False)
+        sharey = kwargs.get('sharey', False)
+        width_ratios = kwargs.get('width_ratios', [1]*ncol)
+        height_ratios = kwargs.get('height_ratios', [1]*nrow)
         fig, axs = plt.subplots(figsize = (figwidth,figheight),
                             nrows = nrow,
                             ncols = ncol,
@@ -213,8 +199,8 @@ class Plot:
         ax.set_title(title)
     def _parse_kwargs(self, kwargs, item_idx=0):
         out = {}
-        out["figwidth"] = kwargs.get('figwidth', 6)
-        out["figheight"] = kwargs.get('figheight', 5)
+        out["figwidth"] = kwargs.get('figwidth', 14)
+        out["figheight"] = kwargs.get('figheight', 10)
         out["cmap"] = kwargs.get('cmap', 'turbo')
         out["levels"] = kwargs.get('levels', None)
         out["norm"] = kwargs.get('norm', 'log')
@@ -355,4 +341,18 @@ class PlotVerticalProfileSigma(Plot):
         if prop["add_colorbar"]:
             self._add_colorbar(ax, fig_obj, levels=prop["cbar_levels"], cbar_ticks=prop["cbar_ticks"], extend=prop["extend"], label=prop["cbar_label"], orientation=prop["cbar_orientation"])
         Plot._set_ax_properties(ax, title=prop["title"], xlabel=prop["xlabel"], ylabel=prop["ylabel"])
+        return ax
+    
+    def bathy(self, ax=None, **kwargs):
+        nc_2d = self.dfsu.geometry.nc_2d
+        n_layers = self.dfsu.geometry.n_layers
+        s = nc_2d[::(n_layers+1), 0]
+        z = nc_2d[::(n_layers+1), 1]
+        if ax is None:
+            fig, ax = MatplotlibShell.subplots(nrow=1, ncol=1)
+        ax.plot(s, z, color='black')
+        ymin = ax.get_ylim()[0]
+        print(ymin)
+        ax.fill_between(s, ymin, z, color='lightgray')
+        # ax.set_xlabel('Distance along profile')
         return ax
