@@ -9,7 +9,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from .dfsu import Dfsu3DSigma, DfsuVerticalProfileSigma
+    from .dfsu import Dfsu3DSigma, DfsuVerticalProfileSigma, Dfsu2D
 
 class MatplotlibShell:
     
@@ -62,7 +62,6 @@ class MatplotlibShell:
     mpl.rcParams['xtick.minor.size'] = 3.0
     mpl.rcParams['ytick.major.size'] = 5.0
     mpl.rcParams['ytick.minor.size'] = 3.0
-    mpl.rcParams['figure.dpi'] = 300.0
     colors = 2*['#283747','#0051a2', '#41ab5d', '#feb24c', '#93003a']
     line_style = 5*['-'] + 5*['--']
     mpl.rcParams['axes.prop_cycle'] = cycler.cycler('color',colors) +cycler.cycler('linestyle',line_style)
@@ -108,7 +107,7 @@ class Plot:
     CMAP = 'turbo'
     LEVELS = None
     NORM = 'log'
-    BOTTOM_THRESHOLD = 1e-6
+    BOTTOM_THRESHOLD = -99999.0
     SHOW_MESH = False
     MESH_ALPHA = 0.5
     MESH_COLOR = 'gray'
@@ -141,12 +140,10 @@ class Plot:
         """
         number = round(number,6)
         if number >= 1:
-            #print(f"{number:.0f}")  # Print with 0 decimal places for numbers >= 1
             out = f"{number:.0f}"
         else:
             # Count how many non-zero decimals are present after the decimal point
             decimals = len(str(number).split('.')[1].rstrip('0'))
-            #print(f"{number:.{decimals}f}")  # Print with the calculated decimal precision
             out = f"{number:.{decimals}f}"
         return out
     @staticmethod
@@ -168,6 +165,7 @@ class Plot:
         if cbar_ticks is not None:
             colorbar.set_ticklabels(cbar_ticks)
         else:
+            levels = np.array(levels).astype(float)
             colorbar.set_ticklabels([Plot.print_number(i) for i in levels])
     def _get_tris(self, z, x_offset=0.0, y_offset=0.0):
         et = self.dfsu.geometry.et_2d
@@ -235,7 +233,7 @@ class Plot:
         out["add_colorbar"] = kwargs.get('add_colorbar', self.ADD_COLORBAR)
         out["cbar_ticks"] = kwargs.get('cbar_ticks', self.CBAR_TICKS)
         out["cbar_orientation"] = kwargs.get('cbar_orientation', self.CBAR_ORIENTATION)
-        out["cbar_label"] = kwargs.get('cbar_label', f"{self.dfsu.ItemInfo[item_idx].Name} ({self.dfsu.ItemInfo[item_idx].Quantity.UnitDescription})")
+        out["cbar_label"] = kwargs.get('cbar_label', self.CBAR_LABEL)
         out["cbar_levels"] = kwargs.get('cbar_levels', self.CBAR_LEVELS)
         out["title"] = kwargs.get('title', self.TITLE)
         out["xlabel"] = kwargs.get('xlabel', self.XLABEL)
@@ -262,6 +260,7 @@ class Plot3DSigma(Plot):
             assert isinstance(time_idx, int), "time_idx must be an integer."
             data = self.dfsu.get_data(item_idx=item_idx, time_idx=time_idx, layer_idx=layer_idx).squeeze()
         node_data = self.dfsu.get_node_data(data, extrapolate=True)
+        prop["bottom_threshold"] = max(prop["bottom_threshold"], 1e-6) if prop["norm"] == 'log' else prop["bottom_threshold"]
         masked_data = np.where(node_data <= prop["bottom_threshold"], prop["bottom_threshold"], node_data)
         triang = self._get_tris(node_data, x_offset=prop["x_offset"], y_offset=prop["y_offset"])
         if prop["levels"] is None:
@@ -326,8 +325,6 @@ class Plot3DSigma(Plot):
         ax = self.contourf(ax=ax, data=data, **kwargs)
         return ax
 
-
-
 class PlotVerticalProfileSigma(Plot):
     def __init__(self, dfsu: 'DfsuVerticalProfileSigma'):
         super().__init__(dfsu)
@@ -340,6 +337,7 @@ class PlotVerticalProfileSigma(Plot):
             assert isinstance(time_idx, int), "time_idx must be an integer."
             data = np.repeat(self.dfsu.get_data(item_idx=item_idx, time_idx=time_idx, layer_idx=None, reshape=False).squeeze(), 2)
         node_data = self.dfsu.get_node_data(data, extrapolate=True)
+        prop["bottom_threshold"] = max(prop["bottom_threshold"], 1e-6) if prop["norm"] == 'log' else prop["bottom_threshold"]
         masked_data = np.where(node_data <= prop["bottom_threshold"], prop["bottom_threshold"], node_data)
         et_2d = self.dfsu.geometry.et_2d
         nc_2d = self.dfsu.geometry.nc_2d
@@ -374,7 +372,108 @@ class PlotVerticalProfileSigma(Plot):
             fig, ax = MatplotlibShell.subplots(nrow=1, ncol=1)
         ax.plot(s, z, color='black')
         ymin = ax.get_ylim()[0]
-        print(ymin)
         ax.fill_between(s, ymin, z, color='lightgray')
         # ax.set_xlabel('Distance along profile')
+        return ax
+    
+    def mean(self, ax=None, item_idx=None, **kwargs):
+        item_idx = 0 if item_idx is None else item_idx
+        assert isinstance(item_idx, int), "item_idx must be an integer."
+
+        data = self.dfsu.statistics.mean(item_idx=item_idx, layer_idx=None, reshape=False).squeeze()
+        ax = self.contourf(ax=ax, data=data, **kwargs)
+        return ax
+    
+    def max(self, ax=None, item_idx=None, **kwargs):
+        item_idx = 0 if item_idx is None else item_idx
+        assert isinstance(item_idx, int), "item_idx must be an integer."
+
+        data = self.dfsu.statistics.max(item_idx=item_idx, layer_idx=None, reshape=False).squeeze()
+        ax = self.contourf(ax=ax, data=data, **kwargs)
+        return ax
+    
+    def min(self, ax=None, item_idx=None, **kwargs):
+        item_idx = 0 if item_idx is None else item_idx
+        assert isinstance(item_idx, int), "item_idx must be an integer."
+
+        data = self.dfsu.statistics.min(item_idx=item_idx, layer_idx=None, reshape=False).squeeze()
+        ax = self.contourf(ax=ax, data=data, **kwargs)
+        return ax
+    
+    def quantile(self, q, ax=None, item_idx=None, **kwargs):
+        item_idx = 0 if item_idx is None else item_idx
+        assert 0 <= q <= 1, "Quantile q must be between 0 and 1."
+        assert isinstance(item_idx, int), "item_idx must be an integer."
+
+        data = self.dfsu.statistics.quantile(q=q, item_idx=item_idx, layer_idx=None, reshape=False).squeeze()
+        ax = self.contourf(ax=ax, data=data, **kwargs)
+        return ax
+
+class Plot2D(Plot):
+    def __init__(self, dfsu: 'Dfsu2D'):
+        super().__init__(dfsu)
+
+    def contourf(self, ax=None, data=None, item_idx=0, time_idx=None, **kwargs):
+        prop = self._parse_kwargs(kwargs, item_idx=item_idx)
+        if data is None:
+            time_idx = self.dfsu.n_timesteps - 1 if time_idx is None else time_idx
+            assert isinstance(item_idx, int), "item_idx must be an integer."
+            assert isinstance(time_idx, int), "time_idx must be an integer."
+            data = self.dfsu.get_data(item_idx=item_idx, time_idx=time_idx).squeeze()
+        node_data = self.dfsu.get_node_data(data, extrapolate=True)
+        prop["bottom_threshold"] = max(prop["bottom_threshold"], 1e-6) if prop["norm"] == 'log' else prop["bottom_threshold"]
+        masked_data = np.where(node_data <= prop["bottom_threshold"], prop["bottom_threshold"], node_data)
+        triang = self._get_tris(node_data, x_offset=prop["x_offset"], y_offset=prop["y_offset"])
+        if prop["levels"] is None:
+            vmin = prop["bottom_threshold"]
+            vmax = np.nanmax(node_data)
+            if prop["norm"] == 'log':
+                prop["levels"] = np.logspace(np.log10(vmin), np.log10(vmax), 100)
+            else:
+                prop["levels"] = np.linspace(vmin, vmax, 100)
+        else:
+            vmin = prop["levels"][0]
+            vmax = prop["levels"][-1]
+        norm = LogNorm(vmin=vmin, vmax=vmax) if prop["norm"] == 'log' else Normalize(vmin=vmin, vmax=vmax)
+        if ax is None:
+            fig, ax = MatplotlibShell.subplots(nrow=1, ncol=1, figwidth=prop["figwidth"], figheight=prop["figheight"])
+        if prop["show_mesh"]:
+            ax.triplot(triang, color=prop["mesh_color"], linewidth=prop["mesh_lw"], alpha=prop["mesh_alpha"])
+        fig_obj = ax.tricontourf(triang, masked_data, cmap=prop["cmap"], norm=norm, extend=prop["extend"], levels=prop["levels"], zorder=prop["zorder"])
+        if prop["add_colorbar"]:
+            self._add_colorbar(ax, fig_obj, levels=prop["cbar_levels"], cbar_ticks=prop["cbar_ticks"], extend=prop["extend"], label=prop["cbar_label"], orientation=prop["cbar_orientation"])
+        Plot._set_ax_properties(ax, title=prop["title"], xlabel=prop["xlabel"], ylabel=prop["ylabel"])
+        return ax
+
+    def quantile(self, q, ax=None, item_idx=None, **kwargs):
+        item_idx = 0 if item_idx is None else item_idx
+        assert 0 <= q <= 1, "Quantile q must be between 0 and 1."
+        assert isinstance(item_idx, int), "item_idx must be an integer."
+
+        data = self.dfsu.statistics.quantile(q=q, item_idx=item_idx, layer_idx=None).squeeze()
+        ax = self.contourf(ax=ax, data=data, **kwargs)
+        return ax
+
+    def max(self, ax=None, item_idx=None, **kwargs):
+        item_idx = 0 if item_idx is None else item_idx
+        assert isinstance(item_idx, int), "item_idx must be an integer."
+
+        data = self.dfsu.statistics.max(item_idx=item_idx, layer_idx=None).squeeze()
+        ax = self.contourf(ax=ax, data=data, **kwargs)
+        return ax
+
+    def min(self, ax=None, item_idx=None, **kwargs):
+        item_idx = 0 if item_idx is None else item_idx
+        assert isinstance(item_idx, int), "item_idx must be an integer."
+
+        data = self.dfsu.statistics.min(item_idx=item_idx, layer_idx=None).squeeze()
+        ax = self.contourf(ax=ax, data=data, **kwargs)
+        return ax
+
+    def mean(self, ax=None, item_idx=None, **kwargs):
+        item_idx = 0 if item_idx is None else item_idx
+        assert isinstance(item_idx, int), "item_idx must be an integer."
+
+        data = self.dfsu.statistics.mean(item_idx=item_idx, layer_idx=None).squeeze()
+        ax = self.contourf(ax=ax, data=data, **kwargs)
         return ax

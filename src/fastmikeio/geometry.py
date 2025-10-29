@@ -9,9 +9,8 @@ from collections import defaultdict
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from .dfsu3dsigma import Dfsu3DSigma
-    from .dfsuverticalprofilesigma import DfsuVerticalProfileSigma
-
+    from .dfsu import Dfsu3DSigma, DfsuVerticalProfileSigma, Dfsu2D
+    
 
 class Point:
     def __init__(self, x, y, z=0):
@@ -151,19 +150,7 @@ class Geometry:
     @property
     def Z(self):
         return self.dfsu.Z
-    @property
-    def HAB(self):
-        zn = self.Z[0:(self.n_layers+1)]
-        HAB = zn - zn[0]
-        return HAB
-    @property
-    def sigma_fraction(self):
-        z = self.nc[:, 2].reshape(self.n_nodes2d, self.n_layers + 1)
-        total_depth = z[:, -1] - z[:, 0]
-        with np.errstate(divide='ignore', invalid='ignore'):
-            sigma = np.diff(z, axis=1) / total_depth[:, np.newaxis]
-            sigma[~np.isfinite(sigma)] = 0.0  # handle division by zero
-        return np.mean(sigma, axis=0)
+    
     @property
     def et(self):
         return np.stack(self.dfsu.ElementTable, axis=1).T - 1
@@ -173,18 +160,6 @@ class Geometry:
     @property
     def ec(self):
         return np.stack(self.dfsu.CalculateElementCenterCoordinates(), axis=1)
-    
-    def _get_bottom_layer_nodes(self):
-        nc = self.nc
-        n_layers = self.n_layers
-        return nc[::(n_layers + 1), :]
-
-    def find_closest_element(self, point):
-        """Find the index of the closest element to a given point in 2D space"""
-        distances = np.sqrt(np.sum((self.geometry.ec_2d - point)**2, axis=1))
-        return np.argmin(distances)
-    
-    
 
 class Geometry3DSigma(Geometry):
     def __init__(self, dfsu: DfsuFile):
@@ -220,6 +195,19 @@ class Geometry3DSigma(Geometry):
     @property
     def _tri2d(self) -> tri.Triangulation:
         return tri.Triangulation(self.nc_2d[:, 0], self.nc_2d[:, 1], self.et_2d)
+    @property
+    def sigma_fraction(self):
+        z = self.nc[:, 2].reshape(self.n_nodes2d, self.n_layers + 1)
+        total_depth = z[:, -1] - z[:, 0]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            sigma = np.diff(z, axis=1) / total_depth[:, np.newaxis]
+            sigma[~np.isfinite(sigma)] = 0.0  # handle division by zero
+        return np.mean(sigma, axis=0)
+    
+    def _get_bottom_layer_nodes(self):
+        nc = self.nc
+        n_layers = self.n_layers
+        return nc[::(n_layers + 1), :]
     
     def _get_bottom_triangles(self):
         n_layers = self.n_layers
@@ -320,8 +308,6 @@ class GeometryVerticalProfileSigma(Geometry):
     def __init__(self, dfsu: DfsuFile):
         super().__init__(dfsu)
 
-
-
     @property
     def nc_1d(self):
         return self.nc[::(self.n_layers + 1), :]
@@ -381,3 +367,52 @@ class GeometryVerticalProfileSigma(Geometry):
         enc = nc_relative[et_relative]     # Coordinates of the element nodes
         ec_relative = np.mean(enc, axis=1)   # Element center coordinates
         return ec_relative
+
+class Geometry2D(Geometry):
+    def __init__(self, dfsu: DfsuFile):
+        super().__init__(dfsu)
+
+    @property
+    def nc_2d(self):
+        return self.nc
+
+    @property
+    def et_2d(self):
+        return self.et
+
+    @property
+    def ec_2d(self):
+        return self.ec
+    
+    @property
+    def edges_2d(self):
+        et_2d = self.et_2d
+        edges = set()
+        for elem in et_2d:
+            n1, n2, n3 = elem
+            edge1 = tuple(sorted((n1, n2)))
+            edge2 = tuple(sorted((n2, n3)))
+            edge3 = tuple(sorted((n3, n1)))
+            edges.update([edge1, edge2, edge3])
+        return np.array(list(edges))
+    @property
+    def _tri2d(self) -> tri.Triangulation:
+        return tri.Triangulation(self.nc_2d[:, 0], self.nc_2d[:, 1], self.et_2d)
+    
+    def to_mesh(self, fname):
+        quantity = eumQuantity(eumItem.eumIBathymetry, eumUnit.eumUmeter)
+        wktstring = self.dfsu.Projection.WKTString
+        nc_2d = self.nc_2d
+        et_2d = self.et_2d
+        nodeIds = np.arange(1, nc_2d.shape[0] + 1)
+        x = nc_2d[:, 0]
+        y = nc_2d[:, 1]
+        z = nc_2d[:, 2]
+        nodeCodes = np.zeros_like(nodeIds)
+        elemIds = np.arange(1, et_2d.shape[0] + 1)
+        elemTypes = np.full_like(elemIds, 21)  # type 21 = triangle
+        connectivity = et_2d + 1  # MikeCore uses 1-based indexing
+        mesh = MeshFile.Create(eumQuantity=quantity, wktString=wktstring,
+                               nodeIds=nodeIds, x=x, y=y, z=z, nodeCode=nodeCodes,
+                               elmtIds=elemIds, elmtTypes=elemTypes, connectivity=connectivity)
+        mesh.Write(fname)

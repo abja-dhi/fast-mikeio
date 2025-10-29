@@ -7,9 +7,10 @@ from scipy.sparse import csr_matrix
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import trange
 
-from .geometry import Geometry3DSigma, GeometryVerticalProfileSigma, Point
-from .statistics import Statistics3DSigma, StatisticsVerticalProfileSigma
-from .plotting import Plot3DSigma, PlotVerticalProfileSigma    
+from .geometry import Geometry3DSigma, GeometryVerticalProfileSigma, Point, Geometry2D
+from .statistics import Statistics3DSigma, StatisticsVerticalProfileSigma, Statistics2D
+from .plotting import Plot3DSigma, PlotVerticalProfileSigma, Plot2D    
+import warnings
 
 
 class Dfsu:
@@ -18,6 +19,7 @@ class Dfsu:
         self.unit_conversion = unit_conversion
         self.dfsu = DfsuFile.Open(filename)
         self.ItemInfo = self.dfsu.ItemInfo
+        self.dfsufiletype = self.dfsu.DfsuFileType
         
     def close(self):
         self.dfsu.Close()
@@ -212,3 +214,36 @@ class DfsuVerticalProfileSigma(Dfsu):
         self.geometry = GeometryVerticalProfileSigma(self.dfsu)
         self.statistics = StatisticsVerticalProfileSigma(self)
         self.plot = PlotVerticalProfileSigma(self)
+
+
+class Dfsu2D(Dfsu):
+    def __init__(self, filename, unit_conversion=1):
+        super().__init__(filename, unit_conversion=unit_conversion)
+        self.geometry = Geometry2D(self.dfsu)
+        self.statistics = Statistics2D(self)
+        self.plot = Plot2D(self)
+
+    def get_data(self, item_idx=None, time_idx=None, layer_idx=None):
+        """
+        Get all data as a 3D numpy array: (items, times, layers, 2d_nodes)
+        """
+        if layer_idx is not None:
+            warnings.warn("layer_idx parameter is not applicable for 2D DFSU files and will be ignored.", UserWarning)
+        # Required variables
+        n2d = self.geometry.ec.shape[0]
+        n_timesteps = self.n_timesteps
+        n_items = self.n_items
+
+        if time_idx is None: time_idx = range(n_timesteps)
+        if item_idx is None: item_idx = range(n_items)
+        if isinstance(item_idx, int): item_idx = [item_idx]
+        if isinstance(time_idx, int): time_idx = [time_idx]
+        data = np.empty((len(item_idx), len(time_idx), self.geometry.ec.shape[0]), dtype=np.float32)
+        for i_item, itm in enumerate(trange(len(item_idx), desc="Items")):
+            itm = item_idx[itm]
+            for i_time, t in enumerate(trange(len(time_idx), desc="Time steps", leave=False)):
+                t = time_idx[t]
+                full_data = self.dfsu.ReadItemTimeStep(itm + 1, t).Data
+                data[i_item, i_time, :] = full_data
+        data *= self.unit_conversion
+        return data
