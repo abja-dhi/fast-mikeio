@@ -6,6 +6,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import trange
+from datetime import datetime, timedelta
 
 from .geometry import Geometry3DSigma, GeometryVerticalProfileSigma, Point, Geometry2D
 from .statistics import Statistics3DSigma, StatisticsVerticalProfileSigma, Statistics2D
@@ -30,9 +31,15 @@ class Dfsu:
     @property
     def n_timesteps(self):
         return self.dfsu.NumberOfTimeSteps
+    @property
+    def timestep(self):
+        return self.dfsu.TimeStepInSeconds
+    @property
+    def datetimes(self):
+        start = self.dfsu.StartDateTime
+        return [start + timedelta(seconds=i * self.timestep) for i in range(self.n_timesteps)]
 
-
-    def get_data(self, item_idx=None, time_idx=None, layer_idx=None, reshape=True):
+    def get_data(self, item_idx=None, time_idx=None, layer_idx=None, reshape=True, progress_bar=True):
         """
         Get all data as a 3D numpy array: (items, times, layers, 2d_nodes)
         """
@@ -52,9 +59,9 @@ class Dfsu:
             data = np.empty((len(item_idx), len(time_idx), len(layer_idx), n2d), dtype=np.float32)
         else:
             data = np.empty((len(item_idx), len(time_idx), self.geometry.ec.shape[0]), dtype=np.float32)
-        for i_item, itm in enumerate(trange(len(item_idx), desc="Items")):
+        for i_item, itm in enumerate(trange(len(item_idx), desc="Items", disable=not progress_bar)):
             itm = item_idx[itm]
-            for i_time, t in enumerate(trange(len(time_idx), desc="Time steps", leave=False)):
+            for i_time, t in enumerate(trange(len(time_idx), desc="Time steps", leave=False, disable=not progress_bar)):
                 t = time_idx[t]
                 if not reshape:
                     full_data = self.dfsu.ReadItemTimeStep(itm + 1, t).Data
@@ -66,13 +73,13 @@ class Dfsu:
         data *= self.unit_conversion
         return data
   
-    def get_node_data(self, data, extrapolate=True):
+    def get_node_data(self, data, extrapolate=True, progress_bar=True):
         et = self.geometry.et_2d # zero based
         ec = self.geometry.ec_2d
         nc = self.geometry.nc_2d
         connectivity_matrix = self._create_node_element_matrix(et, nc.shape[0])
         node_centered_data = np.zeros(shape=nc.shape[0])
-        node_indices = trange(connectivity_matrix.shape[0], desc="Nodes")
+        node_indices = trange(connectivity_matrix.shape[0], desc="Nodes", disable=not progress_bar)
         args = (connectivity_matrix, ec, nc, data, extrapolate)
         with ThreadPoolExecutor(max_workers=40) as executor:
             results = list(executor.map(
@@ -223,7 +230,7 @@ class Dfsu2D(Dfsu):
         self.statistics = Statistics2D(self)
         self.plot = Plot2D(self)
 
-    def get_data(self, item_idx=None, time_idx=None, layer_idx=None):
+    def get_data(self, item_idx=None, time_idx=None, layer_idx=None, progress_bar=True):
         """
         Get all data as a 3D numpy array: (items, times, layers, 2d_nodes)
         """
@@ -239,9 +246,9 @@ class Dfsu2D(Dfsu):
         if isinstance(item_idx, int): item_idx = [item_idx]
         if isinstance(time_idx, int): time_idx = [time_idx]
         data = np.empty((len(item_idx), len(time_idx), self.geometry.ec.shape[0]), dtype=np.float32)
-        for i_item, itm in enumerate(trange(len(item_idx), desc="Items")):
+        for i_item, itm in enumerate(trange(len(item_idx), desc="Items", disable=not progress_bar)):
             itm = item_idx[itm]
-            for i_time, t in enumerate(trange(len(time_idx), desc="Time steps", leave=False)):
+            for i_time, t in enumerate(trange(len(time_idx), desc="Time steps", leave=False, disable=not progress_bar)):
                 t = time_idx[t]
                 full_data = self.dfsu.ReadItemTimeStep(itm + 1, t).Data
                 data[i_item, i_time, :] = full_data
