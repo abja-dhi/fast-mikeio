@@ -9,3 +9,5 @@ examples/
 *.dfsu
 dist/
 *.toml
+*.bat
+update_version.py

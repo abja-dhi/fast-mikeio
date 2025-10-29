@@ -9,7 +9,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from .dfsu3dsigma import Dfsu3DSigma, DfsuVerticalProfileSigma
+    from .dfsu import Dfsu3DSigma, DfsuVerticalProfileSigma
 
 class MatplotlibShell:
     
@@ -103,6 +103,28 @@ class MatplotlibShell:
     
 
 class Plot:
+    FIGWIDTH = 14
+    FIGHEIGHT = 10
+    CMAP = 'turbo'
+    LEVELS = None
+    NORM = 'log'
+    BOTTOM_THRESHOLD = 1e-6
+    SHOW_MESH = False
+    MESH_ALPHA = 0.5
+    MESH_COLOR = 'gray'
+    MESH_LW = 0.5
+    EXTEND = 'neither'
+    ADD_COLORBAR = True
+    CBAR_TICKS = None
+    CBAR_ORIENTATION = 'vertical'
+    CBAR_LABEL = ''
+    CBAR_LEVELS = LEVELS
+    TITLE = ''
+    XLABEL = ''
+    YLABEL = ''
+    ZORDER = 1
+    X_OFFSET = 0.0
+    Y_OFFSET = 0.0
     def __init__(self, dfsu: 'Dfsu3DSigma | DfsuVerticalProfileSigma'):
         self.dfsu = dfsu
 
@@ -199,28 +221,28 @@ class Plot:
         ax.set_title(title)
     def _parse_kwargs(self, kwargs, item_idx=0):
         out = {}
-        out["figwidth"] = kwargs.get('figwidth', 14)
-        out["figheight"] = kwargs.get('figheight', 10)
-        out["cmap"] = kwargs.get('cmap', 'turbo')
-        out["levels"] = kwargs.get('levels', None)
-        out["norm"] = kwargs.get('norm', 'log')
-        out["bottom_threshold"] = kwargs.get('bottom_threshold', 1e-6)
-        out["show_mesh"] = kwargs.get('show_mesh', False)
-        out["mesh_alpha"] = kwargs.get('mesh_alpha', 0.5)
-        out["mesh_color"] = kwargs.get('mesh_color', 'gray')
-        out["mesh_lw"] = kwargs.get('mesh_lw', 0.5)
-        out["extend"] = kwargs.get('extend', 'neither')
-        out["add_colorbar"] = kwargs.get('add_colorbar', True)
-        out["cbar_ticks"] = kwargs.get('cbar_ticks', None)
-        out["cbar_orientation"] = kwargs.get('cbar_orientation', 'vertical')
+        out["figwidth"] = kwargs.get('figwidth', self.FIGWIDTH)
+        out["figheight"] = kwargs.get('figheight', self.FIGHEIGHT)
+        out["cmap"] = kwargs.get('cmap', self.CMAP)
+        out["levels"] = kwargs.get('levels', self.LEVELS)
+        out["norm"] = kwargs.get('norm', self.NORM)
+        out["bottom_threshold"] = kwargs.get('bottom_threshold', self.BOTTOM_THRESHOLD)
+        out["show_mesh"] = kwargs.get('show_mesh', self.SHOW_MESH)
+        out["mesh_alpha"] = kwargs.get('mesh_alpha', self.MESH_ALPHA)
+        out["mesh_color"] = kwargs.get('mesh_color', self.MESH_COLOR)
+        out["mesh_lw"] = kwargs.get('mesh_lw', self.MESH_LW)
+        out["extend"] = kwargs.get('extend', self.EXTEND)
+        out["add_colorbar"] = kwargs.get('add_colorbar', self.ADD_COLORBAR)
+        out["cbar_ticks"] = kwargs.get('cbar_ticks', self.CBAR_TICKS)
+        out["cbar_orientation"] = kwargs.get('cbar_orientation', self.CBAR_ORIENTATION)
         out["cbar_label"] = kwargs.get('cbar_label', f"{self.dfsu.ItemInfo[item_idx].Name} ({self.dfsu.ItemInfo[item_idx].Quantity.UnitDescription})")
-        out["cbar_levels"] = kwargs.get('cbar_levels', out["levels"])
-        out["title"] = kwargs.get('title', '')
-        out["xlabel"] = kwargs.get('xlabel', '')
-        out["ylabel"] = kwargs.get('ylabel', '')
-        out["zorder"] = kwargs.get('zorder', 1)
-        out["x_offset"] = kwargs.get('x_offset', 0.0)
-        out["y_offset"] = kwargs.get('y_offset', 0.0)
+        out["cbar_levels"] = kwargs.get('cbar_levels', self.CBAR_LEVELS)
+        out["title"] = kwargs.get('title', self.TITLE)
+        out["xlabel"] = kwargs.get('xlabel', self.XLABEL)
+        out["ylabel"] = kwargs.get('ylabel', self.YLABEL)
+        out["zorder"] = kwargs.get('zorder', self.ZORDER)
+        out["x_offset"] = kwargs.get('x_offset', self.X_OFFSET)
+        out["y_offset"] = kwargs.get('y_offset', self.Y_OFFSET)
         for key, value in kwargs.items():
             if key not in out:
                 out[key] = value
