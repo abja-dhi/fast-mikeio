@@ -6,3 +6,4 @@ examples/
 /fastmikeio/tests/__pycache__/
 /fastmikeio/__init__*
 !/fastmikeio/__init__.py
+*.dfsu
