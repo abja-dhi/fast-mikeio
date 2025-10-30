@@ -409,7 +409,7 @@ class PlotVerticalProfileSigma(Plot):
         item_idx = 0 if item_idx is None else item_idx
         assert isinstance(item_idx, int), "item_idx must be an integer."
 
-        data = self.dfsu.statistics.mean(item_idx=item_idx, layer_idx=None, reshape=False).squeeze()
+        data = np.repeat(self.dfsu.statistics.mean(item_idx=item_idx, layer_idx=None, reshape=False).squeeze(), 2)
         ax = self.contourf(ax=ax, data=data, **kwargs)
         return ax
     
@@ -417,7 +417,7 @@ class PlotVerticalProfileSigma(Plot):
         item_idx = 0 if item_idx is None else item_idx
         assert isinstance(item_idx, int), "item_idx must be an integer."
 
-        data = self.dfsu.statistics.max(item_idx=item_idx, layer_idx=None, reshape=False).squeeze()
+        data = np.repeat(self.dfsu.statistics.max(item_idx=item_idx, layer_idx=None, reshape=False).squeeze(), 2)
         ax = self.contourf(ax=ax, data=data, **kwargs)
         return ax
     
@@ -425,7 +425,7 @@ class PlotVerticalProfileSigma(Plot):
         item_idx = 0 if item_idx is None else item_idx
         assert isinstance(item_idx, int), "item_idx must be an integer."
 
-        data = self.dfsu.statistics.min(item_idx=item_idx, layer_idx=None, reshape=False).squeeze()
+        data = np.repeat(self.dfsu.statistics.min(item_idx=item_idx, layer_idx=None, reshape=False).squeeze(), 2)
         ax = self.contourf(ax=ax, data=data, **kwargs)
         return ax
     
@@ -434,7 +434,7 @@ class PlotVerticalProfileSigma(Plot):
         assert 0 <= q <= 1, "Quantile q must be between 0 and 1."
         assert isinstance(item_idx, int), "item_idx must be an integer."
 
-        data = self.dfsu.statistics.quantile(q=q, item_idx=item_idx, layer_idx=None, reshape=False).squeeze()
+        data = np.repeat(self.dfsu.statistics.quantile(q=q, item_idx=item_idx, layer_idx=None, reshape=False).squeeze(), 2)
         ax = self.contourf(ax=ax, data=data, **kwargs)
         return ax
 

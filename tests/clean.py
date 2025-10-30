@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    fname = "test_vertical.dfsu"
+    fname = "Cross Section A-A'.dfsu"
     dfsu = fastmikeio.read(fname, unit_conversion=1e17)
     dfsu.plot.NORM = "log"
     dfsu.plot.CMAP = "jet"
@@ -16,7 +16,5 @@ if __name__ == "__main__":
     dfsu.plot.FIGHEIGHT = 10
     dfsu.plot.EXTEND = 'max'
     ax = dfsu.plot.bathy(figwidth=20, figheight=10)
-    # ax = dfsu.plot.contourf(item_idx=1, time_idx=0, title="Horizontal slice at time index 0")
-    # ax.set_aspect('equal')
-    ani = dfsu.plot.animate(ax=ax, item_idx=1, time_indices=[0, 5, 8], layer_index=0)
-    # plt.show()
+    dfsu.plot.max(ax=ax, item_idx=1)
+    plt.show()
